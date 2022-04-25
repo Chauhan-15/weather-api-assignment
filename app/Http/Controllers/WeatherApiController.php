@@ -37,45 +37,40 @@ class WeatherApiController extends Controller
         // if validation fail, return error
         if ($validator->fails()) {
             return response()->json($validator->errors(), 400);
-
-            // vaildation success
         } else {
 
             // check data in database
             $checkDataInDb = Weather::where('date', $date)->first();
 
+            // initalize log data array 
             $weatherData = [];
 
-            // if data exist, user able to see data from db
+            // if data exist, return success response
             if ($checkDataInDb) {
                 return response()->json($checkDataInDb, 200);
-
-                // if data does not exist, fetch data from api as per entered date
             } else {
-                foreach (config('helper-config.citiesArray') as $key => $detail) {
-                    try {
+                // if data does not exist, fetch data from api
+                try {
+                    foreach (config('helper-config.citiesArray') as $key => $detail) {
                         $data = $this->service->getWeatherData($detail);
-
+                        // dd($data);
                         foreach ($data->daily as $key1 => $dateCheck) {
                             $check = Carbon::createFromTimestamp($dateCheck->dt)->toDateString();
                             if ($check == $date) {
                                 $weatherData[$date][$detail['city']] = $dateCheck;
                             }
                         }
-                    } catch (Throwable $th) {
-                        return response()->json($th->getMessage(), 400);
                     }
-                }
-                // if we have weather data after api hit, then we call the event and store the data in db.
-                if (isset($weatherData[$date])) {
-                    try {
+
+                    // if we have weather data after api hit, then we call the event and store the data in db.
+                    if (isset($weatherData[$date])) {
                         event(new WeatherDataFetch($weatherData));
                         return response()->json($weatherData, 200);
-                    } catch (Throwable $th) {
-                        return response()->json($th->getMessage(), 400);
                     }
+                    return response()->json('Data Not Found for ' . $date, 400);
+                } catch (Throwable $th) {
+                    return response()->json($th->getMessage(), 400);
                 }
-                return response()->json('Data not found', 400);
             }
         }
     }
